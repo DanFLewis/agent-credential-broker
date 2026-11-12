@@ -184,20 +184,42 @@ function itemRow(it) {
   const uSel = text('Username selector (optional)', cfg.usernameSelector);
   const pSel = text('Password selector (optional)', cfg.passwordSelector);
 
-  const save = (path, body) => act(async () => {
+  // Canonical form, so the saved config and the form compare equal regardless of key order.
+  const canon = (c) => JSON.stringify([c.submit.kind, c.submit.selector || '', c.usernameSelector || '', c.passwordSelector || '']);
+  const formConfig = () => {
+    const c = { submit: kind.value === 'click' ? { kind: 'click', selector: sel.value.trim() } : { kind: kind.value } };
+    if (uSel.value.trim()) c.usernameSelector = uSel.value.trim();
+    if (pSel.value.trim()) c.passwordSelector = pSel.value.trim();
+    return c;
+  };
+
+  // One button saves whatever changed, so a change can't be left unsaved by pressing the wrong button.
+  const saveBtn = h('button', { type: 'button', text: 'Save changes' });
+  saveBtn.addEventListener('click', () => act(async () => {
+    const fillConfig = formConfig();
+    // Checked before any request, so a bad config can't leave the policy half-saved.
+    if (fillConfig.submit.kind === 'click' && !fillConfig.submit.selector) throw new Error('The click strategy needs a submit button selector.');
+    const policyChanged = policy.value !== it.policy;
+    const cfgChanged = canon(fillConfig) !== canon(cfg);
+    if (!policyChanged && !cfgChanged) {
+      takePassword(pw);
+      flash(`${it.name}: nothing changed.`);
+      return;
+    }
     const password = takePassword(pw);
-    await api('PUT', `/api/items/${encodeURIComponent(it.itemId)}/${path}`, { ...body, password });
-  });
-  const savePolicy = h('button', { type: 'button', text: 'Save policy' });
-  savePolicy.addEventListener('click', () => save('policy', { policy: policy.value }));
-  const saveCfg = h('button', { type: 'button', text: 'Save fill config' });
-  saveCfg.addEventListener('click', () => {
-    const fillConfig = { submit: kind.value === 'click' ? { kind: 'click', selector: sel.value.trim() } : { kind: kind.value } };
-    if (uSel.value.trim()) fillConfig.usernameSelector = uSel.value.trim();
-    if (pSel.value.trim()) fillConfig.passwordSelector = pSel.value.trim();
-    save('fill-config', { fillConfig });
-  });
-  const sync = () => { savePolicy.disabled = saveCfg.disabled = !pw.value; };
+    const base = `/api/items/${encodeURIComponent(it.itemId)}`;
+    const saved = [];
+    if (policyChanged) {
+      await api('PUT', `${base}/policy`, { policy: policy.value, password });
+      saved.push(`policy (${policy.value})`);
+    }
+    if (cfgChanged) {
+      await api('PUT', `${base}/fill-config`, { fillConfig, password });
+      saved.push(`submit strategy (${fillConfig.submit.kind}${fillConfig.submit.selector ? ' ' + fillConfig.submit.selector : ''})`);
+    }
+    flash(`${it.name}: saved ${saved.join(' and ')}.`);
+  }));
+  const sync = () => { saveBtn.disabled = !pw.value; };
   pw.addEventListener('input', sync);
   sync();
 
@@ -206,7 +228,7 @@ function itemRow(it) {
     h('label', { text: 'Policy' }), policy,
     h('label', { text: 'Submit strategy' }), kind, sel, uSel, pSel,
     h('label', { text: 'Dashboard password (required to save)' }), pw,
-    h('div', { class: 'durations' }, savePolicy, saveCfg));
+    h('div', { class: 'durations' }, saveBtn));
 }
 
 function pairingView(p) {
