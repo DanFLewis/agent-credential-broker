@@ -49,14 +49,21 @@ export interface DashboardServerOptions {
 export class DashboardServer {
   private readonly server: http.Server;
   private readonly sessions: SessionStore;
-  private readonly limiter: FailureLimiter;
+  /**
+   * Separate buckets: an unauthenticated local process spamming /api/login must not lock the human
+   * (who already has a session) out of approvals. Password checks behind a session need the cookie
+   * and CSRF token, so only a session holder can fill that bucket.
+   */
+  private readonly loginLimiter: FailureLimiter;
+  private readonly sessionLimiter: FailureLimiter;
   private readonly clock: () => number;
   private boundPort = 0;
 
   constructor(private readonly opts: DashboardServerOptions) {
     this.clock = opts.clock ?? Date.now;
     this.sessions = new SessionStore(this.clock);
-    this.limiter = new FailureLimiter(this.clock);
+    this.loginLimiter = new FailureLimiter(this.clock);
+    this.sessionLimiter = new FailureLimiter(this.clock);
     this.server = http.createServer((req, res) => void this.handle(req, res));
   }
 
@@ -151,7 +158,8 @@ export class DashboardServer {
     if (route === 'GET /api/pairing') return json(res, 200, await svc.pairingState());
     if (route === 'POST /api/pairing/confirm') {
       this.checkPassword(body, url.pathname);
-      await svc.confirmPairing();
+      if (typeof body.pairingCode !== 'string') throw new HttpError(400, 'bad_request');
+      await svc.confirmPairing(body.pairingCode);
       return json(res, 200, { ok: true });
     }
     if (route === 'POST /api/pairing/reset') {
@@ -197,11 +205,12 @@ export class DashboardServer {
 
   /** Verifies body.password with rate limiting. Throws 429 / 401 and audits failures. */
   private checkPassword(body: Body, where: string): void {
-    if (this.limiter.blocked()) throw new HttpError(429, 'rate_limited');
+    const limiter = where === 'login' ? this.loginLimiter : this.sessionLimiter;
+    if (limiter.blocked()) throw new HttpError(429, 'rate_limited');
     const stored = this.opts.store.getSetting(PASSWORD_SETTING);
     if (!stored) throw new HttpError(503, 'password_not_set');
     if (typeof body.password !== 'string' || !verifyPassword(body.password, stored)) {
-      this.limiter.recordFailure();
+      limiter.recordFailure();
       this.opts.store.audit('dashboard_auth_fail', { detail: { where } }); // never the attempted password
       throw new HttpError(401, 'bad_password');
     }

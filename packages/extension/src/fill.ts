@@ -24,7 +24,8 @@ export function fillAndSubmit(
   let pw: HTMLInputElement | null = null;
   if (cfg.passwordSelector) {
     const el = document.querySelector(cfg.passwordSelector);
-    pw = el instanceof HTMLInputElement ? el : null;
+    // Never type the password into a visible text box, whatever the fill config says.
+    pw = el instanceof HTMLInputElement && el.type === 'password' ? el : null;
   } else {
     pw = inputs.find((i) => i.type === 'password' && visible(i)) ?? null;
   }

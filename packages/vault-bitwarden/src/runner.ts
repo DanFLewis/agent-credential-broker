@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { delimiter, extname, join } from 'node:path';
+import { delimiter, extname, join, win32 } from 'node:path';
 
 export interface RunResult {
   code: number;
@@ -29,7 +29,11 @@ export function resolveBw(bwPath: string, platform: string = process.platform, p
   if (platform !== 'win32') return bwPath;
   const ext = extname(bwPath).toLowerCase();
   if (ext === '.cmd' || ext === '.bat') throw new Error(CMD_HELP);
-  if (ext) return bwPath;
+  if (ext) {
+    // A relative path with an extension would resolve against the working directory.
+    if (!win32.isAbsolute(bwPath)) throw new Error('bwPath must be an absolute path to bw.exe.');
+    return bwPath;
+  }
   const exe = findOnPath(bwPath, '.exe', pathVar);
   if (exe) return exe;
   if (findOnPath(bwPath, '.cmd', pathVar)) throw new Error(CMD_HELP);

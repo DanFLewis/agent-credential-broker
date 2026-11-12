@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assertNoSecret, openSecret, secretAad } from '@acb/core';
-import { BrokerError } from '../src/service.js';
+import { MAX_PENDING_TOTAL, BrokerError } from '../src/service.js';
 import { T_PASS, T_USER, grantFor, item, makeCtx, newExtensionKey, pendingFor } from './helpers.js';
 
 const SITE = 'https://example.com';
@@ -44,6 +44,14 @@ describe('requestLogin pre-checks', () => {
     await pendingFor(c, origins[2]!);
     expect(await c.service.requestLogin({ site: origins[3]! }, 'agent-a')).toMatchObject({ code: 'too_many_pending' });
     expect(await c.service.requestLogin({ site: origins[3]! }, 'agent-b')).toMatchObject({ status: 'pending' });
+  });
+
+  it('caps pending requests globally, so rotating self-asserted agent ids does not help', async () => {
+    const c = makeCtx([item('i0', 'n0', 'https://a.test')]);
+    for (let i = 0; i < MAX_PENDING_TOTAL; i++) {
+      expect(await c.service.requestLogin({ site: 'https://a.test' }, `agent-${i}`)).toMatchObject({ status: 'pending' });
+    }
+    expect(await c.service.requestLogin({ site: 'https://a.test' }, 'agent-new')).toMatchObject({ code: 'too_many_pending' });
   });
 
   it('never shows item names or ids to the agent', async () => {
@@ -295,7 +303,7 @@ describe('pairing', () => {
     expect(r.status).toBe('pending');
     expect(c.service.pairedPublicKey()).toBeNull();
     expect((await c.service.pairingState()).pairingCode).toBe(r.pairingCode);
-    await c.service.confirmPairing();
+    await c.service.confirmPairing(r.pairingCode);
     expect(c.service.pairedPublicKey()).toBe(a.publicKey);
     await expect(c.service.requestPairing(b.publicKey)).rejects.toMatchObject({ code: 'already_paired' });
     expect((await c.service.requestPairing(a.publicKey)).status).toBe('paired');
@@ -307,7 +315,22 @@ describe('pairing', () => {
   it('rejects malformed keys and confirming with nothing pending', async () => {
     const c = makeCtx();
     await expect(c.service.requestPairing('x y')).rejects.toMatchObject({ code: 'bad_params' });
-    await expect(c.service.confirmPairing()).rejects.toMatchObject({ code: 'no_pending_pairing' });
+    await expect(c.service.confirmPairing('AAAA-AAAA-AAAA-AAAA')).rejects.toMatchObject({ code: 'no_pending_pairing' });
+  });
+
+  it('confirm is bound to the code the human compared: a key swapped in meanwhile is not paired', async () => {
+    const c = makeCtx();
+    const real = await newExtensionKey();
+    const rogue = await newExtensionKey();
+    const shown = (await c.service.requestPairing(real.publicKey)).pairingCode;
+    await c.service.requestPairing(rogue.publicKey); // rogue filler races in while the human types
+    await expect(c.service.confirmPairing(shown)).rejects.toMatchObject({ code: 'pairing_changed' });
+    expect(c.service.pairedPublicKey()).toBeNull();
+    expect(c.store.listAudit().some((e) => e.event === 'pair_confirm_mismatch')).toBe(true);
+    // The real extension re-registers; the human compares again and confirms.
+    await c.service.requestPairing(real.publicKey);
+    await c.service.confirmPairing(shown);
+    expect(c.service.pairedPublicKey()).toBe(real.publicKey);
   });
 });
 
@@ -315,8 +338,7 @@ describe('no plaintext secret leaks', () => {
   it('requestLogin -> sealed claim: password absent from audit table, result and notifier', async () => {
     const c = makeCtx();
     const kp = await newExtensionKey();
-    await c.service.requestPairing(kp.publicKey);
-    await c.service.confirmPairing();
+    await c.service.confirmPairing((await c.service.requestPairing(kp.publicKey)).pairingCode);
     await grantFor(c, SITE, '1h');
     const claimed: unknown[] = [];
     c.filler.onFill = async (t) => {

@@ -218,7 +218,7 @@ function pairingView(p) {
     const ok = h('button', { type: 'button', text: 'Codes match: confirm pairing', disabled: true });
     pw.addEventListener('input', () => { ok.disabled = !pw.value; });
     ok.addEventListener('click', () => act(async () => {
-      await api('POST', '/api/pairing/confirm', { password: takePassword(pw) });
+      await api('POST', '/api/pairing/confirm', { password: takePassword(pw), pairingCode: p.pairingCode });
     }));
     kids.push(
       h('p', { text: 'Compare this code with the one shown in the browser extension. Confirm only if they are identical.' }),

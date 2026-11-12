@@ -45,6 +45,8 @@ import type { GrantStore } from './store.js';
 export const REQUEST_TTL_MS = 24 * 60 * 60 * 1000;
 export const JOB_TTL_MS = 60 * 1000;
 export const MAX_PENDING_PER_AGENT = 3;
+/** Agent ids are self-asserted, so the per-agent cap alone can be dodged by rotating ids. */
+export const MAX_PENDING_TOTAL = 10;
 const DEFAULT_WAIT_MS = 20_000;
 const MAX_WAIT_MS = 60_000;
 const MAX_HINT_LEN = 500;
@@ -125,13 +127,14 @@ export class BrokerService implements BrokerAgentApi {
     if (grant) return this.fillWithGrant(grant, origin, agentId, params.waitMs);
 
     // No grant: ask the human. Dedupe per (agent, origin) and cap pending requests per agent.
-    const pending = this.store.listPendingRequests(now - REQUEST_TTL_MS).filter((r) => r.agentId === agentId);
+    const allPending = this.store.listPendingRequests(now - REQUEST_TTL_MS);
+    const pending = allPending.filter((r) => r.agentId === agentId);
     const existing = pending.find((r) => r.origin === origin);
     if (existing) {
       this.store.audit('request_deduped', { agentId, origin, requestId: existing.id });
       return pendingResult(existing.id);
     }
-    if (pending.length >= MAX_PENDING_PER_AGENT) return fail('too_many_pending', 'Too many requests are waiting for approval.');
+    if (pending.length >= MAX_PENDING_PER_AGENT || allPending.length >= MAX_PENDING_TOTAL) return fail('too_many_pending', 'Too many requests are waiting for approval.');
 
     const req: ApprovalRequest = {
       id: randomUUID(), agentId, origin, hint: hint ?? null, createdAt: now, status: 'pending',
@@ -164,7 +167,7 @@ export class BrokerService implements BrokerAgentApi {
       agentId, origin, itemId: grant.itemId, grantId: grant.id,
       detail: result.status === 'submitted' ? { status: 'submitted' } : { status: 'error', code: result.code },
     });
-    if (result.status === 'error') return { status: 'error', code: result.code, message: result.message ?? 'Fill failed.' };
+    if (result.status === 'error') return { status: 'error', code: result.code, message: 'The browser extension could not fill the login form.' };
 
     const fresh = this.store.getGrant(grant.id) ?? grant;
     await this.notifier
@@ -258,11 +261,23 @@ export class BrokerService implements BrokerAgentApi {
     return p?.status === 'paired' ? p.publicKey : null;
   }
 
-  async confirmPairing(): Promise<void> {
+  /**
+   * Confirms the pending key only if its code equals the one the human compared. Without this
+   * binding, a process on the pipe could swap in its own pending key while the human types the
+   * password, and the click would pair the attacker's key.
+   */
+  async confirmPairing(expectedCode: string): Promise<void> {
     const p = this.store.getPairing();
     if (p?.status !== 'pending') throw new BrokerError('no_pending_pairing', 'No pairing is waiting for confirmation.');
+    const code = await pairingCode(p.publicKey);
+    // Re-read after the await: the pending row must be the same one we hashed.
+    const now = this.store.getPairing();
+    if (typeof expectedCode !== 'string' || code !== expectedCode || now?.publicKey !== p.publicKey || now.status !== 'pending') {
+      this.store.audit('pair_confirm_mismatch');
+      throw new BrokerError('pairing_changed', 'The pending pairing code changed. Compare the codes again.');
+    }
     this.store.setPairing(p.publicKey, 'paired', p.createdAt);
-    this.store.audit('pair_confirm', { detail: { pairingCode: await pairingCode(p.publicKey) } });
+    this.store.audit('pair_confirm', { detail: { pairingCode: code } });
   }
 
   resetPairing(): void {

@@ -1,6 +1,6 @@
 // Service worker: owns the native-messaging port, the pairing key and the fill-job flow.
 // Logging rule: only job ids and error codes are ever logged, never values, origins or messages.
-import { NATIVE_HOST_NAME, exportPublicKey, normalizeOrigin, openSecret, secretAad } from '@acb/core';
+import { NATIVE_HOST_NAME, exportPublicKey, normalizeOrigin, openSecret, pairingCode, secretAad } from '@acb/core';
 import type {
   BrokerMessage,
   ClaimSecretResult,
@@ -110,9 +110,11 @@ async function ensurePaired(): Promise<void> {
   clearTimeout(pairTimer);
   try {
     const keys = await loadOrCreateKeyPair();
-    const res = await call<PairResult>('pair', { publicKey: await exportPublicKey(keys.publicKey) });
+    const publicKey = await exportPublicKey(keys.publicKey);
+    const res = await call<PairResult>('pair', { publicKey });
     state.pairing = res.status;
-    state.pairingCode = res.pairingCode;
+    // Computed from our own key, never taken from the broker, so the popup cannot be told what to show.
+    state.pairingCode = await pairingCode(publicKey);
     if (res.status === 'paired') return;
   } catch (e) {
     console.warn('pair failed', e instanceof RpcError ? e.code : 'error');

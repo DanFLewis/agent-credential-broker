@@ -190,6 +190,13 @@ describe('fillAndSubmit', () => {
     });
   });
 
+  it('a configured passwordSelector that is not a password input is refused', () => {
+    const p = setup();
+    (globalThis as { document: { querySelector: (s: string) => unknown } }).document.querySelector = (s) => (s === '#u' ? p.user : null);
+    expect(fillAndSubmit(O, CREDS, { ...CFG, passwordSelector: '#u' })).toEqual({ status: 'error', code: 'no_form' });
+    expect(p.user.v).toBe('');
+  });
+
   it('enter strategy falls back to requestSubmit when the page does not handle the key', () => {
     const p = setup();
     expect(fillAndSubmit(O, CREDS, { submit: { kind: 'enter' } }).status).toBe('submitted');

@@ -194,7 +194,7 @@ describe('full flow over the pipe', () => {
     // Pair, human confirms.
     const pair = await fl.rpc('pair', { publicKey: kp.publicKey });
     expect(pair.result.status).toBe('pending');
-    await service.confirmPairing();
+    await service.confirmPairing(pair.result.pairingCode);
 
     // First request is pending; human approves.
     const first = await agent.rpc('requestLogin', { site: SITE });

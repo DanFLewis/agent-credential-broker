@@ -185,6 +185,7 @@ describe('resolveBw (Windows)', () => {
     touch('bw.exe');
     expect(resolveBw('bw', 'win32', dir)).toBe(join(dir, 'bw.exe'));
     expect(resolveBw('C:\\x\\bw.exe', 'win32', dir)).toBe('C:\\x\\bw.exe');
+    expect(() => resolveBw('tools\\bw.exe', 'win32', dir)).toThrow(/absolute/);
     expect(resolveBw('bw', 'linux', dir)).toBe('bw');
   });
 });

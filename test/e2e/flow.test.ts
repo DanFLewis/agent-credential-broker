@@ -163,8 +163,9 @@ describe('end to end with the fake vault and the local test login page', { timeo
     expect(first.pairingCode).toBe(await pairingCode(await exportPublicKey(ext.keys.publicKey)));
     expect((await human.req('GET', '/api/pairing')).json).toEqual({ status: 'pending', pairingCode: first.pairingCode });
 
-    expect((await human.req('POST', '/api/pairing/confirm', { password: 'wrong' })).status).toBe(401);
-    expect((await human.req('POST', '/api/pairing/confirm', { password: DASH_PW })).status).toBe(200);
+    const shown = first.pairingCode;
+    expect((await human.req('POST', '/api/pairing/confirm', { password: 'wrong', pairingCode: shown })).status).toBe(401);
+    expect((await human.req('POST', '/api/pairing/confirm', { password: DASH_PW, pairingCode: shown })).status).toBe(200);
     expect((await ext.pair()).status).toBe('paired'); // repeated pair calls are idempotent
   });
 

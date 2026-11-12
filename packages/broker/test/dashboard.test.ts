@@ -232,6 +232,15 @@ describe('approve and the password requirement', () => {
     expect((await s.post(url, { itemId: 'i1', duration: '1h', password: PW })).status).toBe(429);
   });
 
+  it('failed /api/login attempts from another local process do not lock the session holder out', async () => {
+    const s = await session();
+    const id = await pendingFor(ctx, SITE);
+    for (let i = 0; i < 6; i++) await login('wrong-password-x');
+    expect((await login()).r.status).toBe(429);
+    const ok = await s.post(`/api/requests/${id}/approve`, { itemId: 'i1', duration: '1h', password: PW });
+    expect(ok.status).toBe(200);
+  });
+
   it('validates itemId (must be a candidate), duration and allowed durations', async () => {
     const s = await session();
     ctx.service.setPolicy('i2', 'never-long-grant');
@@ -306,7 +315,11 @@ describe('pairing, status and audit', () => {
     expect((await s.get('/api/pairing')).json).toEqual({ status: 'pending', pairingCode });
     expect((await s.post('/api/pairing/confirm')).status).toBe(401);
     expect(ctx.service.pairedPublicKey()).toBeNull();
-    expect((await s.post('/api/pairing/confirm', { password: PW })).json).toEqual({ ok: true });
+    expect((await s.post('/api/pairing/confirm', { password: PW })).status).toBe(400); // code required
+    const other = await newExtensionKey();
+    expect((await s.post('/api/pairing/confirm', { password: PW, pairingCode: (await ctx.service.requestPairing(other.publicKey)).pairingCode.replace(/^./, (ch) => (ch === 'A' ? 'B' : 'A')) })).json).toEqual({ error: 'pairing_changed' });
+    await ctx.service.requestPairing(kp.publicKey);
+    expect((await s.post('/api/pairing/confirm', { password: PW, pairingCode })).json).toEqual({ ok: true });
     expect((await s.get('/api/status')).json).toEqual({ vault: 'unlocked', fillerConnected: true, pairing: 'paired' });
     expect((await s.post('/api/pairing/reset')).status).toBe(401);
     expect((await s.post('/api/pairing/reset', { password: PW })).json).toEqual({ ok: true });

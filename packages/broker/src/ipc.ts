@@ -157,7 +157,6 @@ export class IpcServer {
           jobId: p.jobId,
           status: p.status,
           code: typeof p.code === 'string' && FILL_ERROR_CODES.has(p.code) ? (p.code as FillErrorCode) : undefined,
-          message: typeof p.message === 'string' ? p.message.slice(0, 200) : undefined,
         };
         return { accepted: filler.handleFillResult(params) };
       }

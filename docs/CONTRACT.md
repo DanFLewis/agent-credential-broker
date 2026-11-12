@@ -30,7 +30,7 @@ Relative imports use the `.js` extension (NodeNext). There are no runtime depend
 `src/crypto.ts` uses `globalThis.crypto.subtle`, which works in both Node 24 and the extension service worker.
 - `generateRecipientKeyPair(): Promise<CryptoKeyPair>` generates ECDH P-256 with a non-extractable private key (`extractable: false` applies to the private key; the public key is always exportable).
 - `exportPublicKey(key: CryptoKey): Promise<string>` returns the raw uncompressed key as base64url.
-- `pairingCode(publicKeyB64u: string): Promise<string>` takes the SHA-256 of the raw key bytes and returns its first 40 bits as Crockford base32, formatted `XXXX-XXXX`.
+- `pairingCode(publicKeyB64u: string): Promise<string>` takes the SHA-256 of the raw key bytes and returns its first 80 bits as Crockford base32, formatted `XXXX-XXXX-XXXX-XXXX`.
 - `sealSecret(recipientPublicKeyB64u: string, secret: { username: string; password: string }, aad: string): Promise<SealedSecret>` creates an ephemeral ECDH P-256 key and derives bits (256) from it. It then runs HKDF-SHA256 with salt = epk raw bytes and info = `"acb-v1-seal"` to get an AES-256-GCM key. It uses a random 12-byte IV, encrypts the plaintext `JSON.stringify({username,password})`, and uses utf8(aad) as the additional data.
 - `openSecret(privateKey: CryptoKey, sealed: SealedSecret, aad: string): Promise<{ username: string; password: string }>` reverses `sealSecret`. It throws on a GCM failure.
 - `b64uEncode(bytes: Uint8Array): string` and `b64uDecode(s: string): Uint8Array`.
@@ -61,7 +61,7 @@ Relative imports use the `.js` extension (NodeNext). There are no runtime depend
     6. With a grant: if no filler is available it returns `no_filler`. Otherwise it creates a job (random 128-bit jobId, expiresAt = now + 60s) in memory with {grantId, itemId, origin, agentId}, audits `fill_job` and awaits `filler.fill(...)`. On `submitted` it audits and notifies use, then returns submitted with the grant's expiry and usesLeft. On an error it returns the error code.
     7. Without a grant: if a pending request for (agentId, origin) already exists, it returns that one's requestId (audit `request_deduped`). If the agent already has 3 pending requests it returns `too_many_pending`. Otherwise it creates the request, audits `request`, calls `notifier.requestApproval` and returns pending.
   - `claimSecret(params, pairedPublicKey)` is called by the extension filler. It looks up the job and checks that it isn't used or expired (`job_expired`). It requires `normalizeOrigin(params.tabOrigin) === job.origin` (`origin_mismatch`) and that the grant is still usable. It marks the job claimed, increments the grant's uses, calls `vault.getSecret`, seals the secret with the AAD `secretAad(jobId, job.origin, documentId)` and audits `secret_released`. A job can be claimed only once.
-  - Dashboard-side methods: approve(requestId, itemId ∈ candidates, duration ∈ allowedDurations(policy)), deny, revoke, revokeAll, setPolicy, setFillConfig, listing methods, pairing (requestPairing(publicKey) → stored as pending with its code; confirmPairing; resetPairing). A request expires after 24h.
+  - Dashboard-side methods: approve(requestId, itemId ∈ candidates, duration ∈ allowedDurations(policy)), deny, revoke, revokeAll, setPolicy, setFillConfig, listing methods, pairing (requestPairing(publicKey) → stored as pending with its code; confirmPairing(expectedCode); resetPairing). A request expires after 24h.
 - `class ExtensionFiller implements Filler` tracks the single connected filler connection (role filler). `fill()` pushes `fill_job`, then resolves when that jobId's `fillResult` arrives or on timeout. When no filler is connected, `isAvailable()` is false.
 - `class DashboardNotifier implements Notifier` writes to stdout ("Approval needed: <origin> from <agentId>, open http://127.0.0.1:7414"). Toasts come later.
 - `IpcServer` listens on `pipePath()`. The first line must be a hello message or the socket is destroyed. Role agent may call only `requestLogin`, `grantStatus` and `listGrants`. Role filler may call only `claimSecret`, `fillResult` and `pair`. Only one filler connection is allowed at a time; a newer one replaces the older. Messages are limited to 1 MiB. RPC errors carry only a code and a generic message, never a stack.
@@ -90,7 +90,7 @@ Every response is JSON. Every request must have a `Host` header of exactly `127.
 | PUT | /api/items/:itemId/policy | `{policy, password}` | `{ok:true}`. Setting `blocked` or `never-long-grant` also revokes that item's grants when they are no longer allowed. |
 | PUT | /api/items/:itemId/fill-config | `{fillConfig, password}` | `{ok:true}` |
 | GET | /api/pairing | – | `{status, pairingCode?}` |
-| POST | /api/pairing/confirm | `{password}` | `{ok:true}` |
+| POST | /api/pairing/confirm | `{password, pairingCode}` (the code the human compared) | `{ok:true}`, or 400 `pairing_changed` if the pending key no longer has that code |
 | POST | /api/pairing/reset | `{password}` | `{ok:true}` |
 
 Deny, revoke and revoke-all deliberately don't need the password, because they move in the safe direction and a panic button should take one click.

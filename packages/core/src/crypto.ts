@@ -30,14 +30,18 @@ export async function exportPublicKey(key: CryptoKey): Promise<string> {
   return b64uEncode(new Uint8Array(await subtle.exportKey('raw', key)));
 }
 
-/** 40 bits of SHA-256(raw public key) as Crockford base32, "XXXX-XXXX"; humans compare it on both screens. */
+/**
+ * 80 bits of SHA-256(raw public key) as Crockford base32, "XXXX-XXXX-XXXX-XXXX"; humans compare it
+ * on both screens. 80 bits so a same-user attacker cannot grind a key whose code collides with the
+ * real extension's (the pending key is readable in broker.db).
+ */
 export async function pairingCode(publicKeyB64u: string): Promise<string> {
   const digest = new Uint8Array(await subtle.digest('SHA-256', b64uDecode(publicKeyB64u) as BufferSource));
   let bits = 0n;
-  for (const b of digest.subarray(0, 5)) bits = (bits << 8n) | BigInt(b);
+  for (const b of digest.subarray(0, 10)) bits = (bits << 8n) | BigInt(b);
   let out = '';
-  for (let i = 7; i >= 0; i--) out += CROCKFORD[Number((bits >> BigInt(i * 5)) & 31n)];
-  return `${out.slice(0, 4)}-${out.slice(4)}`;
+  for (let i = 15; i >= 0; i--) out += CROCKFORD[Number((bits >> BigInt(i * 5)) & 31n)];
+  return out.match(/.{4}/g)!.join('-');
 }
 
 /** Shared by seal and open: ECDH shared bits -> HKDF (salt = ephemeral public key) -> AES-GCM key. */

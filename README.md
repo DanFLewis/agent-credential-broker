@@ -4,7 +4,7 @@ Lets an AI agent (Claude Code first) sign in to websites without ever seeing the
 
 The agent calls an MCP tool such as `request_login({ site: "https://example.com" })`. You approve the request on a local dashboard: you pick the vault item and how long the grant lasts (one use, 1 hour, 1 day, 7 days or 30 days). A browser extension then fills and submits the login form in a tab you already have open. The agent only gets a status back: `submitted`, `pending`, `denied` or an error code. Credentials come from Bitwarden or Vaultwarden through the `bw` CLI.
 
-The guarantee is narrower than "the agent cannot get the password". Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before you rely on it. In short: the password never enters the agent's tool results, logs or IPC channel, and it is only ever typed into a page whose top-frame origin exactly equals the origin you approved. An agent that runs as your Windows user and sets out to attack the system can still get around this. v1 aims to make leaks by accident impossible, and to make deliberate theft harder and visible in the audit log.
+The guarantee is narrower than "the agent cannot get the password". Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before you rely on it. In short: the password never enters the agent's tool results, logs or IPC channel, and it is only ever typed into a page whose top-frame origin exactly equals the origin you approved. An agent that runs as your Windows user and sets out to attack the system can still get around this. v1 aims to make leaks by accident impossible, and to make deliberate theft harder. Another process running as your user can still edit the broker's database directly, so the audit log is not tamper-evident.
 
 ```
 agent ─MCP stdio─► acb-mcp ─named pipe─► acb-broker ─named pipe─► acb-native-host ─native messaging─► extension ─► page
@@ -88,7 +88,7 @@ This writes `%LOCALAPPDATA%\acb\native-host\com.acb.broker.json` and sets the pe
 
 ### 6. Pair the extension
 
-The extension's popup shows a pairing code such as `K7QM-3XRA`. Open the dashboard, check that it shows the same code, and confirm with your dashboard password. From then on, the broker encrypts every credential to that extension's key. If you reinstall the extension, reset pairing on the dashboard and pair again.
+The extension's popup shows a pairing code such as `K7QM-3XRA-9TFE-2BWN`. Open the dashboard, check that it shows the same code, and confirm with your dashboard password. If the code changes before you click, the broker refuses the confirmation and you compare again. From then on, the broker encrypts every credential to that extension's key. If you reinstall the extension, reset pairing on the dashboard and pair again.
 
 ### 7. Add the MCP server to Claude Code
 

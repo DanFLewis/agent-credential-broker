@@ -99,7 +99,7 @@ describe('seal / open', () => {
 describe('pairingCode', () => {
   it('has the XXXX-XXXX Crockford format', async () => {
     const kp = await generateRecipientKeyPair();
-    expect(await pairingCode(await exportPublicKey(kp.publicKey))).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(await pairingCode(await exportPublicKey(kp.publicKey))).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
   });
 
   it('is stable for the same key and differs between keys', async () => {
@@ -109,14 +109,14 @@ describe('pairingCode', () => {
     expect(await pairingCode(a)).not.toBe(await pairingCode(b));
   });
 
-  it('matches a known vector (SHA-256 of 65 zero bytes, first 40 bits)', async () => {
+  it('matches a known vector (SHA-256 of 65 zero bytes, first 80 bits)', async () => {
     const key = b64uEncode(new Uint8Array(65));
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(65)));
     const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
     let bits = '';
-    for (const b of digest.subarray(0, 5)) bits += b.toString(2).padStart(8, '0');
+    for (const b of digest.subarray(0, 10)) bits += b.toString(2).padStart(8, '0');
     let expected = '';
-    for (let i = 0; i < 40; i += 5) expected += alphabet[parseInt(bits.slice(i, i + 5), 2)];
-    expect(await pairingCode(key)).toBe(`${expected.slice(0, 4)}-${expected.slice(4)}`);
+    for (let i = 0; i < 80; i += 5) expected += alphabet[parseInt(bits.slice(i, i + 5), 2)];
+    expect(await pairingCode(key)).toBe(expected.match(/.{4}/g)!.join('-'));
   });
 });

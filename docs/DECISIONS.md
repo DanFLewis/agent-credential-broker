@@ -32,8 +32,28 @@ Advisor points I didn't take, or changed:
 - **Require the password for revoke-all.** It doesn't need one. Deny, revoke and revoke-all move in the safe direction, and a panic button should take one click. The worst a rogue caller can do with them is deny service.
 - **Approve with Windows Hello (WebAuthn, user verification required).** Recorded as the top "later" item. It is the only approval factor that a same-user agent can't replay.
 
+## Changed by the security review
+
+A second Fable review read the finished v1 statically, concentrating on the secret path and the origin check. It found the origin normalisation, the documentId pinning, single-use claiming and the seal sound. The changes below came out of it.
+
+| # | Finding | Change | Test |
+|---|---|---|---|
+| S1 (high) | Pairing confirm took no argument and paired whatever key was pending. A process on the pipe could swap in its own key while the human typed the password, and the click paired the attacker. The 40-bit code could also be ground offline from `broker.db`. | `confirmPairing(expectedCode)` compares the code the dashboard displayed with the pending key's code and refuses on mismatch (`pairing_changed`, audited). The code is now 80 bits (`XXXX-XXXX-XXXX-XXXX`). The extension computes its displayed code from its own key instead of trusting the broker's answer. | service, dashboard, e2e |
+| S2 (med) | All authorisation state is in a user-writable SQLite file, so "forensics on the profile" and "visible in the audit log" overstated the bar. | Docs corrected (threat model and the limits below). The real fix is the separate Windows account, already planned. | n/a |
+| S3 (low) | A filler could send a 200-character free-text `message` that reached the agent, and the MCP projection passed broker text through. | The broker drops `message` from fill results. The MCP server builds every agent-visible message from a fixed table keyed by error code, and request ids must match `[A-Za-z0-9-]{1,64}`. | mcp no-secret |
+| S4 (low) | The pending-request caps keyed on the self-asserted agent id. | A global cap of 10 pending requests on top of 3 per agent. | service |
+| S5 (low) | One global password limiter: five bad `/api/login` posts a minute from a local process kept the human from approving. | Separate buckets for login and for in-session password checks. In-session checks need the cookie and CSRF token. | dashboard |
+| S6 (hardening) | A configured `passwordSelector` accepted any visible input. | It must be an `<input type="password">`, or the fill is refused. | fill |
+| S7 (hardening) | A relative `ACB_BW_PATH` with an extension was spawned as given. | It must be absolute. | bitwarden |
+
+Documented rather than fixed in v1:
+- **The session cookie is shared across localhost ports**, because cookies ignore ports. A dev server the agent runs and the human visits gets the cookie. With it, a caller can read pending requests, item names and the audit log, and can deny or revoke, but can't approve without the password. HTTPS on a dedicated hostname would fix this and is out of scope for v1.
+- **The extension does not authenticate the broker.** Signing fill jobs with a broker key pinned at pairing is the fix. Without it the worst case is a login CSRF, not disclosure.
+- **HKDF doesn't bind the recipient public key**, and **Bitwarden "Never" URI match types are ignored**. No attack was found for either; both are small follow-ups.
+- **`no_match`, `blocked` and `pending` tell the agent whether a vault item exists for an origin.** Accepted: the agent needs to know whether asking makes sense.
+
 ## Remaining honest limits (also in the threat model)
-- The agent runs as the same Windows user. It can read broker memory (including `BW_SESSION`) and parse the Chrome profile to extract the extension's key. Sealing raises the bar from "connect to a pipe" to "do forensics on the profile". It doesn't remove the risk. Running the broker as a separate Windows user is a later step.
+- The agent runs as the same Windows user. It can read broker memory (including `BW_SESSION`) and parse the Chrome profile to extract the extension's key. Sealing stops a process that only connects to the pipe. It doesn't stop one that writes to `broker.db`, which can replace the paired key, add a grant or delete audit rows (S2). Running the broker as a separate Windows user is a later step.
 - The agent ID is a self-asserted label. In practice a grant covers (item, origin) for any process running as the same user.
 - If the Bitwarden browser extension is unlocked in the browser profile the agent drives, the broker can be bypassed entirely.
 - A rogue filler can use up a grant's remaining uses (denial of service), but it can't read the secret.

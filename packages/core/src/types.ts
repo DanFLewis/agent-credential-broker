@@ -159,6 +159,7 @@ export type AuditEvent =
   | 'fill_config_change'
   | 'pair_request'
   | 'pair_confirm'
+  | 'pair_confirm_mismatch'
   | 'pair_reset'
   | 'vault_unlock'
   | 'dashboard_login'
