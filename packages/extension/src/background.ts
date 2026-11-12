@@ -55,7 +55,9 @@ function connect(): void {
     onBrokerMessage(m);
   });
   p.onDisconnect.addListener(() => {
-    void chrome.runtime.lastError; // read it so Chrome does not warn; its text is not needed
+    // Chrome's own reason (e.g. "Specified native messaging host not found."); it never carries page or secret data.
+    const reason = chrome.runtime.lastError?.message;
+    if (reason) console.warn('native host disconnected:', reason);
     if (port === p) port = null;
     state.connected = false;
     state.pairing = 'unknown';
