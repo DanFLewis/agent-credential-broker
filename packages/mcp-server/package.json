@@ -1,0 +1,11 @@
+{
+  "name": "@acb/mcp-server",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "dependencies": { "@acb/core": "0.1.0", "@modelcontextprotocol/sdk": "^1.20.0", "zod": "^3.25.0" },
+  "bin": { "acb-mcp": "./dist/index.js" }
+}

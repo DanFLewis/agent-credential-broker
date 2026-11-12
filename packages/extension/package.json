@@ -1,0 +1,10 @@
+{
+  "name": "@acb/extension",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "@acb/core": "0.1.0" },
+  "devDependencies": { "esbuild": "^0.25.0", "@types/chrome": "^0.1.0" }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "agent-credential-broker",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lets AI agents sign in to websites without ever seeing the password.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "tsc -b && npm run build -w @acb/extension",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "broker": "node packages/broker/dist/cli.js",
+    "e2e:login-page": "node test/login-page/server.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

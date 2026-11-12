@@ -1,0 +1,10 @@
+{
+  "name": "@acb/vault-fake",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "dependencies": { "@acb/core": "0.1.0" }
+}

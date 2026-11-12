@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM"],
+    "types": ["chrome"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "paths": { "@acb/core": ["../core/src/index.ts"] }
+  },
+  "include": ["src", "test"]
+}

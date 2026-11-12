@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Agent Credential Broker</title>
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Agent Credential Broker</h1>
+    <button id="logout" type="button" class="quiet" hidden>Log out</button>
+  </header>
+  <main>
+    <p id="flash" role="status" hidden></p>
+    <section id="login" hidden>
+      <h2>Log in</h2>
+      <form id="login-form">
+        <label for="login-password">Dashboard password</label>
+        <input id="login-password" type="password" autocomplete="current-password">
+        <button type="submit">Log in</button>
+      </form>
+    </section>
+    <div id="app" hidden>
+      <section id="status" aria-label="Status"></section>
+      <section><h2>Pending requests</h2><div id="requests"></div></section>
+      <section id="pairing-section"><h2>Extension pairing</h2><div id="pairing"></div></section>
+      <section>
+        <h2>Grants</h2>
+        <div id="grants"></div>
+        <button id="revoke-all" type="button" class="danger-outline">Revoke all grants</button>
+      </section>
+      <section><h2>Items</h2><div id="items"></div></section>
+      <section><h2>Audit log</h2><div id="audit"></div></section>
+    </div>
+  </main>
+</body>
+</html>

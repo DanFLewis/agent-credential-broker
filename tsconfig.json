@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/dashboard" },
+    { "path": "packages/vault-fake" },
+    { "path": "packages/vault-bitwarden" },
+    { "path": "packages/broker" },
+    { "path": "packages/mcp-server" },
+    { "path": "packages/native-host" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "itemId": "fake-1",
+      "name": "Test login page",
+      "uris": ["http://127.0.0.1:8765/"],
+      "username": "test-user",
+      "password": "correct-horse-test-only"
+    },
+    {
+      "itemId": "fake-2",
+      "name": "Test login page (alt account)",
+      "uris": ["http://127.0.0.1:8765/"],
+      "username": "alt-user",
+      "password": "alt-horse-test-only"
+    },
+    {
+      "itemId": "fake-3",
+      "name": "Fake bank",
+      "uris": ["https://bank.example.test/"],
+      "username": "fake-bank-user",
+      "password": "fake-bank-pw-test-only"
+    }
+  ]
+}

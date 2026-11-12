@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Credential Broker",
+  "version": "0.1.0",
+  "description": "Fills logins approved on the local broker dashboard. Never exposes credentials to pages or agents.",
+  "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt9KR8URBnVkFyUx30GyWI22iTix47geiCxbOm5Z4JwzlXAwB8DWnvrB9J7hgEapq7UayL3ueFbqHLQT3Hybozsq1z/ZPpDtmMcyMRjvZBHmGbnORb8eYGyLdRqs/NY65zKfiHcdqyu90Iv7YrXIHaMuD/JDz0WQsWIViYyYozk3rd9uEiyJ2z3cWc185gfDU/LzuHR50UHh3jY1Z1LGVnYacmvg55DzCF1vzUGxmuZwySgS0c53XZJtQlcbgVRW6L75C8wM/7FIfzI21mUO25wYibMlZnyKL316YEgqxrwtN2BSCn8mlB6ZCVC3yK7RbL4eY3ii9SmZa6zNdokxaXQIDAQAB",
+  "permissions": ["nativeMessaging", "scripting", "tabs", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Agent Credential Broker", "default_popup": "popup.html" }
+}
