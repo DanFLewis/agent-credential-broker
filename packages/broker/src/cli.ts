@@ -75,9 +75,11 @@ async function createVault(args: string[]): Promise<{ vault: VaultAdapter; id: s
     return { vault: FakeVault.fromFixture(fixture), id: 'fake' };
   }
   if (kind !== 'bitwarden') throw new Error(`Unknown vault "${kind}"`);
+  // ACB_BW_PATH: full path to bw.exe when it is not on PATH (npm's bw.cmd cannot be spawned without a shell).
+  const bwPath = process.env.ACB_BW_PATH || undefined;
   const session = process.env.BW_SESSION;
-  if (session) return { vault: new BitwardenVault({ session }), id: 'bitwarden' };
-  const vault = new BitwardenVault();
+  if (session) return { vault: new BitwardenVault({ session, bwPath }), id: 'bitwarden' };
+  const vault = new BitwardenVault({ bwPath });
   await vault.unlock(await promptHidden('Bitwarden master password: '));
   return { vault, id: 'bitwarden' };
 }
