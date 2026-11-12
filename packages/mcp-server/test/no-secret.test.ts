@@ -86,6 +86,24 @@ describe('no secret in MCP responses', () => {
     for (const [name, args] of calls) assertNoSecret(await c.callTool({ name, arguments: args }), SECRETS);
   });
 
+  it('agent-visible messages come from a fixed table, never from the broker or filler', async () => {
+    const api: BrokerAgentApi = {
+      requestLogin: async (p) =>
+        (p.site === 'https://pending.test'
+          ? { status: 'pending', requestId: 'r1', message: `x ${SECRETS[1]}` }
+          : { status: 'error', code: 'no_form', message: `leak ${SECRETS[1]}` }) as never,
+      grantStatus: async () => ({ requestId: `r ${SECRETS[1]}`, status: 'pending' }) as never,
+      listGrants: async () => [] as never,
+    };
+    const c = await connect(api);
+    const calls = [
+      ['request_login', { site: 'https://a.test' }],
+      ['request_login', { site: 'https://pending.test' }],
+      ['grant_status', { request_id: 'r1' }],
+    ] as const;
+    for (const [name, args] of calls) assertNoSecret(await c.callTool({ name, arguments: args }), SECRETS);
+  });
+
   it('thrown errors do not leak their message', async () => {
     const api: BrokerAgentApi = {
       ...evil,
