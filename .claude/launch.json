@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "test-login-page", "runtimeExecutable": "node", "runtimeArgs": ["test/login-page/server.mjs"], "port": 8765 }
+  ]
+}
