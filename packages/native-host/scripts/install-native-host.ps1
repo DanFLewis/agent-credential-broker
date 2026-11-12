@@ -9,10 +9,15 @@
 [CmdletBinding()]
 param(
   # Defaults to the ID derived from the key in packages\extension\manifest.json.
-  [string]$ExtensionId = (Get-Content -Raw (Join-Path $PSScriptRoot '..\..\extension\EXTENSION_ID.txt')).Trim(),
+  [string]$ExtensionId = '',
   [string]$NodePath = ''
 )
 $ErrorActionPreference = 'Stop'
+
+# Resolved here, not in the param default: Windows PowerShell 5.1 leaves $PSScriptRoot empty there.
+if (-not $ExtensionId) {
+  $ExtensionId = (Get-Content -Raw (Join-Path $PSScriptRoot '..\..\extension\EXTENSION_ID.txt')).Trim()
+}
 
 if ($ExtensionId -notmatch '^[a-p]{32}$') { throw "Invalid extension id: $ExtensionId" }
 
