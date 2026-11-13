@@ -60,7 +60,9 @@ Install `bw.exe`, for example with `winget install Bitwarden.CLI`. Then log in o
 node packages\broker\dist\cli.js start --vault bitwarden
 ```
 
-The broker asks for the master password at a hidden console prompt. Alternatively, it uses `BW_SESSION` from the environment if that is set. If `bw.exe` is not on `PATH` (an npm install gives you `bw.cmd`, which cannot be run without a shell), set `ACB_BW_PATH` to the full path of `bw.exe`.
+The broker asks for the master password at a hidden console prompt. Alternatively, it uses `BW_SESSION` from the environment if that is set.
+
+The broker reads your vault through `bw`, which works from a local copy that only changes when you run `bw sync`. After you add or edit an item in the Bitwarden app or web vault, run `bw sync`. The broker also caches the list of items (not the passwords) for 60 seconds, so a new item can take up to a minute to appear. If `bw.exe` is not on `PATH` (an npm install gives you `bw.cmd`, which cannot be run without a shell), set `ACB_BW_PATH` to the full path of `bw.exe`.
 
 To try everything without a real vault, use the fake one:
 
@@ -85,6 +87,8 @@ powershell -ExecutionPolicy Bypass -File packages\native-host\scripts\install-na
 ```
 
 This writes `%LOCALAPPDATA%\acb\native-host\com.acb.broker.json` and sets the per-user registry keys for Chrome and Edge. It needs no admin rights. `uninstall-native-host.ps1` reverses it. Restart the browser afterwards.
+
+Run it from an ordinary PowerShell window, not from a terminal inside the Claude desktop app. The desktop app is packaged with MSIX, which redirects writes to `HKCU` and `%LOCALAPPDATA%` into its own private copy that Chrome can't see. If the extension's service worker logs "Specified native messaging host not found.", this is the usual cause. Start the broker outside the app for the same reason, so that its database lands in the real `%LOCALAPPDATA%\acb`.
 
 ### 6. Pair the extension
 
@@ -112,6 +116,32 @@ Per item you can set:
 - A submit strategy (`requestSubmit`, `enter`, or `click` on a CSS selector) and optional username and password field selectors, for router pages that log in through a JavaScript button.
 
 Revoke one grant or all of them at any time. Neither needs the password.
+
+The dashboard lists an item only after an agent has asked for it. For a site that needs a submit strategy, set it on the item's card while the first request is waiting, and approve after that. If you approve first, the first fill uses `requestSubmit`, which for those sites sends a wrong password.
+
+## Setting up a site
+
+A sign-in only goes through when every part matches exactly. These are the things that went wrong when the tool was first tested against home routers.
+
+**Use the origin the browser ends up at.** The vault item's URI must equal the tab's origin, including the scheme and port, and the broker matches it before anything is filled. Some pages redirect in the browser by script, so open the login page, let it settle, and copy the origin from the address bar. A request for an origin with no open tab returns `no_tab`.
+
+**Chrome must trust the site's certificate, or the page must be plain `http`.** If Chrome stops at a certificate warning, the login page never loads and nothing can be filled. Routers usually ship with a self-signed or expired certificate. You have three choices:
+- If the device serves the same page over plain `http`, use that. The broker allows `http` on the local network only, and flags it as unencrypted.
+- If the device can import a certificate, give it one your machine trusts.
+- If the device has its own certificate authority, trust that authority's root in your user's certificate store. This lets the device sign a certificate for any site, so do this only for a device you control.
+
+**Password-only logins still need a username in the vault.** Bitwarden returns an empty username as null, and the broker refuses an item without one. Put any placeholder in the username. If the page has no username field, the placeholder is never typed.
+
+**Check the stored password for spaces.** The broker sends the password exactly as stored. A leading or trailing space from a paste makes the site reject it, with nothing to say why.
+
+**Pick the submit strategy from the login button.** If the button runs a script that changes the form before it's sent, for example by hashing or encoding the password into a hidden field, use `click` on the button. `requestSubmit` sends the form without running that script.
+
+### Devices tested so far
+
+| Device | Origin in the vault | Submit strategy | Notes |
+|---|---|---|---|
+| ASUS router (Asuswrt firmware) | `https://www.asusrouter.com:8443` | `click`, `div.button` | The page at the router's IP redirects to this hostname. The firmware tested has no certificate import, so the router's own root CA was trusted. Its Sign In button base64-encodes the credentials into a hidden field. Three failed sign-ins turn on a captcha. |
+| AT&T BGW320-505 | `http://192.168.1.254` | `click`, `input[name="Continue"]` | The HTTPS certificate is self-signed and expired, and plain `http` doesn't redirect. There is no username field. The access-code page only appears when you open a protected page such as `/cgi-bin/home.ha`, and it needs that page's cookie. Continue hashes the code with a one-time nonce, so reload the page if it has been open a while. |
 
 ## Local test login page
 
