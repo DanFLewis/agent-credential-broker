@@ -66,7 +66,7 @@ Each plug-in type is a small interface, and each plug-in is a separate package:
 - A Chrome/Edge extension for filling forms.
 - An MCP server exposing `request_login`, `grant_status` and `list_grants`, all of which return metadata only.
 - A local dashboard for approving, denying, revoking and reading the log.
-- First real test: signing in to the ASUS router and the AT&T gateway in Dan's home network.
+- First real test: signing in to the ASUS router and the AT&T gateway on a home network.
 
 ## Later
 - ntfy push with Approve buttons for phone approval.

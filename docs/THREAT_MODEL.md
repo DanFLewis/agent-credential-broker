@@ -17,7 +17,7 @@ not tamper-evident against a same-user attacker, who can edit `broker.db` direct
 ## Actors
 | Actor | Trust | Capabilities assumed |
 |---|---|---|
-| Human (Dan) | trusted | Approves on the dashboard and knows the dashboard password |
+| Human (the owner) | trusted | Approves on the dashboard and knows the dashboard password |
 | Broker process | trusted | Holds the vault session in memory |
 | Browser extension | trusted | Holds the non-extractable ECDH private key in IndexedDB |
 | AI agent (Claude Code) | **untrusted but not assumed malicious** | Calls MCP tools. Has a shell as the same Windows user. May have browser-automation tools. May be prompt-injected by web content. |
