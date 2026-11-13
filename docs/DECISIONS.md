@@ -63,3 +63,18 @@ Documented rather than fixed in v1:
 - If the Bitwarden browser extension is unlocked in the browser profile the agent drives, the broker can be bypassed entirely.
 - A rogue filler can use up a grant's remaining uses (denial of service), but it can't read the secret.
 - An IP-literal grant is bound to an address, not to a device.
+
+## Open findings from the second security review
+
+A second review before publishing found nothing high-severity. The documentation findings are fixed in the README: keep `BW_SESSION` out of shells an agent uses, and treat trusting a device's root certificate as a last resort. These code findings are still open:
+
+| # | Severity | Where | Finding | Planned fix |
+|---|---|---|---|---|
+| R1 | Low-medium | `vault-bitwarden/src/index.ts` `find`, dashboard approval form | The agent's hint reorders the candidates, and the dashboard preselects the first one. With two logins for one origin, a hurried approver can approve the account the agent asked for, such as admin instead of guest. | No default selection when there is more than one candidate. |
+| R2 | Low | `extension/src/fill.ts` | With the `click` strategy, the action-origin check covers only the password field's form and the button's own `formaction`. A button in a different form, or a password field outside any form, skips the check. `usernameSelector` accepts hidden inputs. | Check the click target's form too, refuse when no form can be checked, and require a visible text-like username field. |
+| R3 | Low | `broker/src/service.ts` `requestLogin` | The dashboard's own origin is not refused. If the dashboard password were stored in the vault, one grant would give an agent a signed-in dashboard session. Approvals still ask for the password again. | Refuse 127.0.0.1 and localhost on the dashboard port. |
+| R4 | Low | `broker/src/index.ts`, `core/src/node.ts`, `broker/src/ipc.ts` | On macOS and Linux, `~/.acb`, `broker.db` and the socket get default permissions, so other local users may read them. | `0o700` on the directory, `0o600` on the database and socket. |
+| R5 | Low | `broker/src/ipc.ts`, `filler.ts` | A filler can report `submitted` for a job it never claimed, which writes a false audit row. This extends the rogue-filler limit above. | Accept `submitted` only for a claimed job. |
+| R6 | Nit | `broker/src/dashboard-server.ts` | The request path chosen by the caller goes into the audit detail. | Use a fixed route label. |
+| R7 | Nit | `broker/src/cli.ts` | Raw error messages are printed. A malformed fixture file can be echoed. | Print fixed text. |
+| R8 | Nit | `mcp-server/src/server.ts` | Tool descriptions hardcode port 7414. | Read `ACB_DASHBOARD_PORT`. |

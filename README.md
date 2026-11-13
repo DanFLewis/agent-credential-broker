@@ -60,9 +60,9 @@ Install `bw.exe`, for example with `winget install Bitwarden.CLI`. Then log in o
 node packages\broker\dist\cli.js start --vault bitwarden
 ```
 
-The broker asks for the master password at a hidden console prompt. Alternatively, it uses `BW_SESSION` from the environment if that is set.
+The broker asks for the master password at a hidden console prompt. Use the prompt. The broker also accepts `BW_SESSION` from the environment, but anything that inherits that variable can run `bw get` and read the whole vault without the broker. If you set it, set it only for the broker's own process, never in a shell that an agent or its tools also run from. If `bw.exe` is not on `PATH` (an npm install gives you `bw.cmd`, which cannot be run without a shell), set `ACB_BW_PATH` to the full path of `bw.exe`.
 
-The broker reads your vault through `bw`, which works from a local copy that only changes when you run `bw sync`. After you add or edit an item in the Bitwarden app or web vault, run `bw sync`. The broker also caches the list of items (not the passwords) for 60 seconds, so a new item can take up to a minute to appear. If `bw.exe` is not on `PATH` (an npm install gives you `bw.cmd`, which cannot be run without a shell), set `ACB_BW_PATH` to the full path of `bw.exe`.
+The broker reads your vault through `bw`, which works from a local copy that only changes when you run `bw sync`. After you add or edit an item in the Bitwarden app or web vault, run `bw sync`. The broker also caches the list of items (not the passwords) for 60 seconds, so a new item can take up to a minute to appear.
 
 To try everything without a real vault, use the fake one:
 
@@ -85,6 +85,8 @@ Recent branded Chrome builds ignore the `--load-extension` command-line flag, so
 ```powershell
 powershell -ExecutionPolicy Bypass -File packages\native-host\scripts\install-native-host.ps1
 ```
+
+`-ExecutionPolicy Bypass` applies only to this one `powershell` process, so the script can run without you changing the machine's policy.
 
 This writes `%LOCALAPPDATA%\acb\native-host\com.acb.broker.json` and sets the per-user registry keys for Chrome and Edge. It needs no admin rights. `uninstall-native-host.ps1` reverses it. Restart the browser afterwards.
 
@@ -125,10 +127,13 @@ A sign-in only goes through when every part matches exactly. These are the thing
 
 **Use the origin the browser ends up at.** The vault item's URI must equal the tab's origin, including the scheme and port, and the broker matches it before anything is filled. Some pages redirect in the browser by script, so open the login page, let it settle, and copy the origin from the address bar. A request for an origin with no open tab returns `no_tab`.
 
-**Chrome must trust the site's certificate, or the page must be plain `http`.** If Chrome stops at a certificate warning, the login page never loads and nothing can be filled. Routers usually ship with a self-signed or expired certificate. You have three choices:
-- If the device serves the same page over plain `http`, use that. The broker allows `http` on the local network only, and flags it as unencrypted.
-- If the device can import a certificate, give it one your machine trusts.
-- If the device has its own certificate authority, trust that authority's root in your user's certificate store. This lets the device sign a certificate for any site, so do this only for a device you control.
+**Chrome must trust the site's certificate, or the page must be plain `http`.** If Chrome stops at a certificate warning, the login page never loads and nothing can be filled. Routers usually ship with a self-signed or expired certificate. In order of preference:
+1. If the device can import a certificate, give it one your machine trusts.
+2. If you can trust the device's own certificate (the leaf, not its issuer) on its own, do that.
+3. If the device serves the same page over plain `http`, use that. The broker allows `http` on the local network only and flags it as unencrypted. Anyone on the network can read what is sent, and some login pages send the password itself.
+4. As a last resort, trust the device's own certificate authority in your user's certificate store. Your machine then trusts any certificate that authority signs, for every site, including your bank and your password vault. Anyone who gets that authority's key, through a firmware flaw or by taking the device, can intercept all of your HTTPS traffic. If you do this, consider a separate browser profile, or a separate Windows user, for these devices.
+
+A grant for a public hostname that a device answers on locally, such as `www.asusrouter.com`, is bound to that name, not to the device. Any server reachable under that name gets the fill.
 
 **Password-only logins still need a username in the vault.** Bitwarden returns an empty username as null, and the broker refuses an item without one. Put any placeholder in the username. If the page has no username field, the placeholder is never typed.
 
@@ -140,8 +145,8 @@ A sign-in only goes through when every part matches exactly. These are the thing
 
 | Device | Origin in the vault | Submit strategy | Notes |
 |---|---|---|---|
-| ASUS router (Asuswrt firmware) | `https://www.asusrouter.com:8443` | `click`, `div.button` | The page at the router's IP redirects to this hostname. The firmware tested has no certificate import, so the router's own root CA was trusted. Its Sign In button base64-encodes the credentials into a hidden field. Three failed sign-ins turn on a captcha. |
-| AT&T BGW320-505 | `http://192.168.1.254` | `click`, `input[name="Continue"]` | The HTTPS certificate is self-signed and expired, and plain `http` doesn't redirect. There is no username field. The access-code page only appears when you open a protected page such as `/cgi-bin/home.ha`, and it needs that page's cookie. Continue hashes the code with a one-time nonce, so reload the page if it has been open a while. |
+| ASUS router (Asuswrt firmware) | `https://www.asusrouter.com:8443` | `click`, `div.button` | The page at the router's IP redirects to this hostname. The firmware tested has no certificate import, so the test fell back to trusting the router's own root CA (option 4 above). Its Sign In button base64-encodes the credentials into a hidden field. Three failed sign-ins turn on a captcha. |
+| AT&T fiber gateway (Arris) | `http://192.168.1.254` | `click`, `input[name="Continue"]` | The HTTPS certificate is self-signed and expired, and plain `http` doesn't redirect. There is no username field. The access-code page only appears when you open a protected page such as `/cgi-bin/home.ha`, and it needs that page's cookie. Continue hashes the code with a one-time nonce, so reload the page if it has been open a while. |
 
 ## Local test login page
 
